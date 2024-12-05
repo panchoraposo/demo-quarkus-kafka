@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature and Humidity Gauge</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 10px;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px; /* Espacio entre los gráficos */
+        }
+        .gauge {
+            width: 150px;
+            height: 120px;
+            margin: 10px 0;
+        }
+        h1, h2 {
+            margin: 5px 0;
+        }
+        .gauge-container {
+            text-align: center;
+        }
+        .value-container {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .unit {
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chart-container">
+        <div class="gauge-container">
+            <h2>Temperature</h2>
+            <div id="temperatureGauge" class="gauge"></div>
+            <div class="value-container">
+                <span id="temperatureValue"></span><span class="unit"> °C</span>
+            </div>
+        </div>
+        <div class="gauge-container">
+            <h2>Humidity</h2>
+            <div id="humidityGauge" class="gauge"></div>
+            <div class="value-container">
+                <span id="humidityValue"></span><span class="unit"> %</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const endpoint = "http://localhost:8080/temperature-humidity";
+
+        function createGauge(container, min, max, initialValue, color) {
+            const width = 150;  // Reducción del tamaño para gráficos compactos
+            const height = 120;
+            const radius = Math.min(width, height) / 2;
+
+            const svg = d3.select(container)
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const arc = d3.arc()
+                .innerRadius(radius - 20)
+                .outerRadius(radius)
+                .startAngle(-Math.PI / 2);
+
+            const scale = d3.scaleLinear()
+                .domain([min, max])
+                .range([-Math.PI / 2, Math.PI / 2]);
+
+            const background = svg.append("path")
+                .datum({ endAngle: Math.PI / 2 })
+                .style("fill", "#ddd")
+                .attr("transform", `translate(${width / 2}, ${height})`)
+                .attr("d", arc);
+
+            const foreground = svg.append("path")
+                .datum({ endAngle: scale(initialValue) })
+                .style("fill", color)
+                .attr("transform", `translate(${width / 2}, ${height})`)
+                .attr("d", arc);
+
+            return {
+                update: (value) => {
+                    foreground.datum({ endAngle: scale(value) }).attr("d", arc);
+                }
+            };
+        }
+
+        const temperatureGauge = createGauge("#temperatureGauge", 0, 50, 0, "orange");
+        const humidityGauge = createGauge("#humidityGauge", 0, 100, 0, "blue");
+
+        async function fetchAndUpdate() {
+            try {
+                const response = await fetch(endpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Received data:', data);
+
+                // Asegúrate de que el JSON recibido tiene los valores correctos
+                temperatureGauge.update(data.temperature);
+                humidityGauge.update(data.humidity);
+
+                // Actualiza el valor y la unidad debajo de cada gráfico
+                document.getElementById('temperatureValue').innerText = data.temperature.toFixed(1);
+                document.getElementById('humidityValue').innerText = data.humidity.toFixed(1);
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        setInterval(fetchAndUpdate, 2000);
+    </script>
+</body>
+</html>
